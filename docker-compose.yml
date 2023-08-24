@@ -1,0 +1,83 @@
+version: '3.5'
+
+services:
+  nginx: # Load Balancer
+    image: nginx:latest
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api1
+      # - api2
+    ports:
+      - "9999:9999"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: '0.3GB'
+
+  api1:
+    container_name: api1
+    hostname: api1
+    image: golang:1.17
+    volumes:
+      - ./:/go/src/app:rw
+    environment:
+      REDIS_HOST: redis
+      DB_DRIVER: "mysql"
+      DB_HOST: "mysql"
+      DB_DATABASE: "app"
+      DB_USERNAME: "root"
+      DB_PASSWORD: "powerfull_password"
+      DB_PORT: 3306
+      PORT: 80
+    command: /go/src/app/run
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: '0.7GB'
+
+  db:
+    container_name: db
+    image: postgres:latest
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: rinha
+      POSTGRES_PASSWORD: rinha
+      POSTGRES_DB: rinha_backend
+    volumes:
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '0.8GB'
+
+  redis:
+    container_name: redis
+    image: redis:latest
+    healthcheck:
+      test: [ "CMD", "redis-cli","ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - 6379:6379
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: '0.5GB'

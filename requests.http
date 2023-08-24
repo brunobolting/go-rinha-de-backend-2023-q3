@@ -1,0 +1,16 @@
+### Send POST request with json body
+POST http://localhost:9999/pessoas
+Content-Type: application/json
+Accept: application/json
+
+{
+  "apelido" : "josé1",
+  "nome" : "José Roberto",
+  "nascimento" : "2000-10-01",
+  "stack" : ["C#", "Node", "Oracle"]
+}
+
+### Send GET request
+GET http://localhost:9999
+Content-Type: application/json
+Accept: application/json

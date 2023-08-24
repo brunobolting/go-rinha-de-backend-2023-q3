@@ -1,0 +1,9 @@
+#!/bin/sh
+
+set -e
+
+cd /go/src/app
+
+make build
+
+./bin/app
