@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	entity "github.com/brunobolting/go-rinha-backend/domain"
+	"github.com/lib/pq"
 )
 
 type Service struct {
@@ -35,19 +36,37 @@ func (s *Service) FindPerson(q string) ([]*entity.Person, error) {
 	return s.db.Find(q)
 }
 
-func (s *Service) CreatePerson(nickname, name, birthdate string) (string, error) {
-	e, err := entity.NewPerson(nickname, name, birthdate)
+func (s *Service) CreatePerson(nickname, name, birthdate string, stack []string) (*entity.Person, error) {
+	e, err := entity.NewPerson(nickname, name, birthdate, stack)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	v, err := s.db.Create(e)
+	exists, err := s.cache.NicknameExists(e.Nickname)
+	if exists {
+		return nil, entity.ErrInvalidNickname
+	}
+	err = s.db.Create(e)
 	if err != nil {
-		return "", err
+		if pgerr, ok := err.(*pq.Error); ok {
+			if pgerr.Code == "23505" {
+				return nil, entity.ErrInvalidNickname
+			}
+		}
+
+		return nil, err
 	}
 
-	s.cache.Create(e)
+	err = s.cache.Create(e)
+	if err != nil {
+		return nil, err
+	}
 
-	return v, nil
+	err = s.cache.SetNickname(e.Nickname)
+	if err != nil {
+		return nil, err
+	}
+
+	return e, nil
 }
 
 func (s *Service) CountPerson() (int32, error) {

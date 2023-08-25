@@ -1,12 +1,14 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
-	"fmt"
+	"errors"
+	"time"
 
 	entity "github.com/brunobolting/go-rinha-backend/domain"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 type PersonPosgreSql struct {
@@ -27,11 +29,17 @@ func (r *PersonPosgreSql) Get(id string) (*entity.Person, error) {
 
 	defer stmt.Close()
 
-	row := stmt.QueryRow(id)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	row := stmt.QueryRowContext(ctx, id)
 
 	p := &entity.Person{}
 
-	err = row.Scan(&p.ID, &p.Nickname, &p.Name, &p.Birthdate, &p.Stack)
+	err = row.Scan(&p.ID, &p.Nickname, &p.Name, &p.Birthdate, pq.Array(&p.Stack))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, entity.ErrEntityNotFound
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -41,24 +49,27 @@ func (r *PersonPosgreSql) Get(id string) (*entity.Person, error) {
 
 func (r *PersonPosgreSql) Create(p *entity.Person) error {
 	query := "INSERT INTO persons (id, nickname, name, birthdate, stack) VALUES ($1, $2, $3, $4, $5)"
-	_, err := r.db.Exec(query, p.ID, p.Nickname, p.Name, p.Birthdate, p.Stack)
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+	defer cancel()
+	_, err := r.db.ExecContext(ctx, query, p.ID, p.Nickname, p.Name, p.Birthdate, pq.Array(p.Stack))
 	return err
 }
 
 func (r *PersonPosgreSql) Find(q string) ([]*entity.Person, error) {
-	stmt, err := r.db.Prepare("SELECT id, nickname, name, birthdate, stack FROM persons WHERE search_values LIKE $1")
+	query := "SELECT id, nickname, name, birthdate, stack FROM persons WHERE search ~ $1 LIMIT 50"
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	rows, err := r.db.QueryContext(ctx, query, q)
 	if err != nil {
 		return nil, err
 	}
-
-	rows, err := stmt.Query(fmt.Sprintf("%%%s%%", q))
-	rows.Close()
+	defer rows.Close()
 
 	var persons []*entity.Person
 
 	for rows.Next() {
 		p := &entity.Person{}
-		err = rows.Scan(&p.ID, &p.Nickname, &p.Name, &p.Birthdate, &p.Stack)
+		err = rows.Scan(&p.ID, &p.Nickname, &p.Name, &p.Birthdate, pq.Array(&p.Stack))
 		if err != nil {
 			return nil, err
 		}

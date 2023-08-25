@@ -4,13 +4,23 @@ Content-Type: application/json
 Accept: application/json
 
 {
-  "apelido" : "josé1",
+  "apelido" : "johson",
   "nome" : "José Roberto",
   "nascimento" : "2000-10-01",
-  "stack" : ["C#", "Node", "Oracle"]
+  "stack" : ["C#"]
 }
 
 ### Send GET request
-GET http://localhost:9999
+GET http://localhost:9999/pessoas/d0dcc999-f291-4e1f-b8c4-72d6acc9b3f0
+Content-Type: application/json
+Accept: application/json
+
+### Send GET request
+GET http://localhost:9999/pessoas?t=berto
+Content-Type: application/json
+Accept: application/json
+
+### Send GET request
+GET http://localhost:9999/contagem-pessoas
 Content-Type: application/json
 Accept: application/json

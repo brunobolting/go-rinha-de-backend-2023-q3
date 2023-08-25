@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	entity "github.com/brunobolting/go-rinha-backend/domain"
 	"github.com/go-redis/redis/v8"
@@ -20,7 +21,8 @@ func NewPersonRedis(cache *redis.Client) *PersonRedis {
 }
 
 func (r *PersonRedis) Get(id string) (*entity.Person, error) {
-	v, err := r.cache.Get(context.Background(), id).Bytes()
+	v, err := r.cache.Get(context.Background(), id).Result()
+
 	if errors.Is(err, redis.Nil) {
 		return nil, entity.ErrEntityNotFound
 	}
@@ -28,26 +30,30 @@ func (r *PersonRedis) Get(id string) (*entity.Person, error) {
 		return nil, err
 	}
 
-	var p *entity.Person
+	var p entity.Person
 
-	err = json.Unmarshal(v, p)
+	err = json.Unmarshal([]byte(v), &p)
 	if err != nil {
 		return nil, err
 	}
 
-	return p, nil
+	return &p, nil
 }
 
-func (r *PersonRedis) Create(p *entity.Person) (string, error) {
+func (r *PersonRedis) Create(p *entity.Person) error {
 	v, err := json.Marshal(p)
 	if err != nil {
-		return "", err
-	}
-	key := p.ID.String()
-	err = r.cache.Set(context.Background(), key, v, 0).Err()
-	if err != nil {
-		return "", err
+		return err
 	}
 
-	return key, nil
+	return r.cache.Set(context.Background(), p.ID.String(), v, 0).Err()
+}
+
+func (r *PersonRedis) SetNickname(n string) error {
+	return r.cache.Set(context.Background(), fmt.Sprintf("nickname:%s", n), "", 0).Err()
+}
+
+func (r *PersonRedis) NicknameExists(n string) (bool, error) {
+	v, err := r.cache.Exists(context.Background(), fmt.Sprintf("nickname:%s", n)).Result()
+	return v == 1, err
 }
